@@ -7,10 +7,7 @@
 > 기본 python 내장 모듈 </br>
 
 * Usage : sudo arp_spoof.py &lt;interface&gt; &lt;sender ip 1&gt; &lt;target ip 1&gt; [&lt;sender ip 2&gt; &lt;target ip 2&gt;...] </br>
-* 완성도 : ping 통신, 인터넷 접속 모두 가능.</br>
-
-
-![ping 통신 youtube link](https://www.youtube.com/watch?v=HgCd-OaVj2Q)
+* 완성도 : ping 통신, 인터넷 접속 모두 가능. ![youtube_link](https://www.youtube.com/watch?v=HgCd-OaVj2Q)</br>
 
 
 ## Homework
